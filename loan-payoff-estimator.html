@@ -395,7 +395,7 @@
       }
     };
 
-    if (!balance || !annRate || !payment || balance <= 0 || annRate < 0 || payment <= 0) {
+    if (!balance || balance <= 0 || isNaN(annRate) || annRate < 0 || !payment || payment <= 0) {
       warning.style.display = 'none';
       tableWrap.style.display = 'block';
       tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Enter your loan details above to see the breakdown.</td></tr>';
@@ -443,6 +443,13 @@
         principal: principalCharge,
         balance: Math.max(0, remaining),
       });
+    }
+
+    if (remaining > 0.005) {
+      warning.style.display = 'block';
+      tableWrap.style.display = 'none';
+      setStats(null, null, null);
+      return;
     }
 
     setStats(rows.length, totalPaid, totalInterest);
