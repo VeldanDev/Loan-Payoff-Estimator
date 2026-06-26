@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loan Payoff Estimator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px 60px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: #64748b;
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    /* Inputs */
+    .inputs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 540px) {
+      .inputs { grid-template-columns: 1fr; }
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #94a3b8;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap span {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+      font-size: 0.95rem;
+      pointer-events: none;
+    }
+
+    .input-wrap input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #f1f5f9;
+      font-size: 1rem;
+      font-weight: 500;
+      padding: 11px 12px 11px 28px;
+      outline: none;
+      transition: border-color 0.18s, box-shadow 0.18s;
+      -moz-appearance: textfield;
+    }
+
+    .input-wrap input::-webkit-outer-spin-button,
+    .input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .input-wrap input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+    }
+
+    .input-wrap.pct span { left: auto; right: 12px; }
+    .input-wrap.pct input { padding-left: 12px; padding-right: 28px; }
+
+    /* Summary stats */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 540px) {
+      .stats { grid-template-columns: 1fr; }
+    }
+
+    .stat-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 20px 18px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 14px 14px 0 0;
+    }
+
+    .stat-card.blue::before  { background: linear-gradient(90deg, #38bdf8, #0ea5e9); }
+    .stat-card.purple::before { background: linear-gradient(90deg, #818cf8, #6366f1); }
+    .stat-card.red::before   { background: linear-gradient(90deg, #f87171, #ef4444); }
+
+    .stat-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .stat-card.blue  .stat-value { color: #38bdf8; }
+    .stat-card.purple .stat-value { color: #818cf8; }
+    .stat-card.red   .stat-value { color: #f87171; }
+
+    .stat-sub {
+      font-size: 0.78rem;
+      color: #475569;
+      margin-top: 4px;
+    }
+
+    /* Warning */
+    .warning {
+      display: none;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: #fca5a5;
+      font-size: 0.92rem;
+      font-weight: 500;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    .warning svg {
+      vertical-align: -3px;
+      margin-right: 6px;
+    }
+
+    /* Table */
+    .table-wrap {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #334155;
+    }
+
+    .table-header h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .table-header span {
+      font-size: 0.8rem;
+      color: #475569;
+    }
+
+    .table-scroll {
+      max-height: 380px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+
+    .table-scroll::-webkit-scrollbar { width: 6px; }
+    .table-scroll::-webkit-scrollbar-track { background: transparent; }
+    .table-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #162032;
+      color: #64748b;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 10px 16px;
+      text-align: right;
+      white-space: nowrap;
+      z-index: 1;
+    }
+
+    thead th:first-child { text-align: center; }
+
+    tbody tr {
+      border-top: 1px solid #1e2d3d;
+      transition: background 0.1s;
+    }
+
+    tbody tr:hover { background: #243347; }
+
+    tbody tr:last-child td { color: #f1f5f9; font-weight: 600; }
+
+    td {
+      padding: 9px 16px;
+      text-align: right;
+      color: #94a3b8;
+    }
+
+    td:first-child {
+      text-align: center;
+      color: #475569;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    td.interest { color: #f87171; }
+    td.principal { color: #34d399; }
+    td.balance { color: #e2e8f0; }
+
+    .empty-state {
+      padding: 48px 20px;
+      text-align: center;
+      color: #475569;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Loan Payoff Estimator</h1>
+    <p>See exactly when you'll be debt-free and how much you'll pay.</p>
+  </header>
+
+  <div class="inputs">
+    <div class="field">
+      <label>Loan Balance</label>
+      <div class="input-wrap">
+        <span>$</span>
+        <input type="number" id="balance" placeholder="8500" min="0" step="any" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Annual Interest Rate</label>
+      <div class="input-wrap pct">
+        <span>%</span>
+        <input type="number" id="rate" placeholder="6.5" min="0" max="100" step="any" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Monthly Payment</label>
+      <div class="input-wrap">
+        <span>$</span>
+        <input type="number" id="payment" placeholder="200" min="0" step="any" />
+      </div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card blue">
+      <div class="stat-label">Months to Payoff</div>
+      <div class="stat-value" id="stat-months">—</div>
+      <div class="stat-sub" id="stat-years"></div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">Total Amount Paid</div>
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-sub" id="stat-total-sub"></div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">Total Interest Paid</div>
+      <div class="stat-value" id="stat-interest">—</div>
+      <div class="stat-sub" id="stat-interest-sub"></div>
+    </div>
+  </div>
+
+  <div class="warning" id="warning">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Payment too low — your monthly payment doesn't cover the first month's interest. The balance will never be paid off.
+  </div>
+
+  <div class="table-wrap" id="table-wrap">
+    <div class="table-header">
+      <h2>Month-by-Month Breakdown</h2>
+      <span id="row-count"></span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Interest</th>
+            <th>Principal</th>
+            <th>Remaining Balance</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="4" class="empty-state">Enter your loan details above to see the breakdown.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const fmt = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function calculate() {
+    const balance  = parseFloat(document.getElementById('balance').value);
+    const annRate  = parseFloat(document.getElementById('rate').value);
+    const payment  = parseFloat(document.getElementById('payment').value);
+
+    const warning   = document.getElementById('warning');
+    const tableWrap = document.getElementById('table-wrap');
+    const tbody     = document.getElementById('table-body');
+
+    const setStats = (months, total, interest) => {
+      document.getElementById('stat-months').textContent   = months !== null ? months : '—';
+      document.getElementById('stat-total').textContent    = total    !== null ? fmt(total)    : '—';
+      document.getElementById('stat-interest').textContent = interest !== null ? fmt(interest) : '—';
+
+      if (months !== null) {
+        const yrs = Math.floor(months / 12);
+        const mos = months % 12;
+        document.getElementById('stat-years').textContent =
+          yrs > 0 && mos > 0 ? `${yrs}y ${mos}m`
+          : yrs > 0 ? `${yrs} year${yrs > 1 ? 's' : ''}`
+          : `${mos} month${mos !== 1 ? 's' : ''}`;
+        document.getElementById('stat-total-sub').textContent = `principal + interest`;
+        document.getElementById('stat-interest-sub').textContent =
+          `${((interest / balance) * 100).toFixed(1)}% of principal`;
+      } else {
+        document.getElementById('stat-years').textContent = '';
+        document.getElementById('stat-total-sub').textContent = '';
+        document.getElementById('stat-interest-sub').textContent = '';
+      }
+    };
+
+    if (!balance || !annRate || !payment || balance <= 0 || annRate < 0 || payment <= 0) {
+      warning.style.display = 'none';
+      tableWrap.style.display = 'block';
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Enter your loan details above to see the breakdown.</td></tr>';
+      document.getElementById('row-count').textContent = '';
+      setStats(null, null, null);
+      return;
+    }
+
+    const monthlyRate = annRate / 100 / 12;
+    const firstInterest = balance * monthlyRate;
+
+    if (payment <= firstInterest) {
+      warning.style.display = 'block';
+      tableWrap.style.display = 'none';
+      setStats(null, null, null);
+      return;
+    }
+
+    warning.style.display = 'none';
+    tableWrap.style.display = 'block';
+
+    const rows = [];
+    let remaining = balance;
+    let totalPaid = 0;
+    let totalInterest = 0;
+    const MAX_MONTHS = 600;
+
+    while (remaining > 0.005 && rows.length < MAX_MONTHS) {
+      const interestCharge = remaining * monthlyRate;
+      let principalCharge = payment - interestCharge;
+      let actualPayment = payment;
+
+      if (principalCharge > remaining) {
+        principalCharge = remaining;
+        actualPayment   = remaining + interestCharge;
+      }
+
+      remaining     -= principalCharge;
+      totalPaid     += actualPayment;
+      totalInterest += interestCharge;
+
+      rows.push({
+        month: rows.length + 1,
+        interest: interestCharge,
+        principal: principalCharge,
+        balance: Math.max(0, remaining),
+      });
+    }
+
+    setStats(rows.length, totalPaid, totalInterest);
+    document.getElementById('row-count').textContent = `${rows.length} payment${rows.length !== 1 ? 's' : ''}`;
+
+    const fragment = document.createDocumentFragment();
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td>${r.month}</td>` +
+        `<td class="interest">${fmt(r.interest)}</td>` +
+        `<td class="principal">${fmt(r.principal)}</td>` +
+        `<td class="balance">${fmt(r.balance)}</td>`;
+      fragment.appendChild(tr);
+    });
+
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
+  }
+
+  ['balance', 'rate', 'payment'].forEach(id => {
+    document.getElementById(id).addEventListener('input', calculate);
+  });
+
+  document.getElementById('balance').value  = '8500';
+  document.getElementById('rate').value     = '6.5';
+  document.getElementById('payment').value  = '200';
+  calculate();
+</script>
+</body>
+</html>
